@@ -1,0 +1,57 @@
+# Page snapshot
+
+```yaml
+- banner:
+  - heading "Modern Wheel Picker" [level=1]
+  - navigation:
+    - link "Home":
+      - /url: "#"
+    - link "Templates":
+      - /url: "#"
+    - link "Help":
+      - /url: "#"
+- main:
+  - heading "Wheel Picker" [level=1]
+  - paragraph: Spin the wheel to make random decisions
+  - complementary:
+    - heading "Configurações" [level=2]
+    - button "Itens (0/0) −" [expanded]
+    - textbox "Novo item (máx. 80 caracteres)"
+    - text: 0/80
+    - button "Adicionar item": Adicionar
+    - button "Embaralhar itens": Shuffle
+    - button "Exportar itens": Exportar
+    - button "Importar itens": Importar
+    - paragraph: Nenhum item ainda. Adicione alguns acima.
+    - button "Opções de Sorteio +"
+    - button "Importar/Exportar +"
+    - button "Dicas +"
+    - heading "Histórico (últimos 50)" [level=2]
+    - button "Exportar JSON" [disabled]
+    - button "Exportar CSV" [disabled]
+    - button "Limpar"
+    - text: Período
+    - combobox "Período":
+      - option "Hoje"
+      - option "7 dias"
+      - option "30 dias"
+      - option "Todos" [selected]
+    - text: Buscar
+    - textbox "Buscar"
+    - text: Por página
+    - combobox "Por página":
+      - option "5"
+      - option "10" [selected]
+      - option "25"
+    - text: Sem resultados ainda.
+    - heading "Contagem por item" [level=3]
+    - text: Sem contagens ainda.
+    - button "Compartilhar configuração": Compartilhar
+    - button "Exportar dados": Exportar
+  - main:
+    - paragraph: Adicione pelo menos 2 itens para usar a roda
+    - text: "Último resultado:"
+    - strong: —
+- contentinfo:
+  - paragraph: Modern Wheel Picker - A modern alternative to PickerWheel.com
+```

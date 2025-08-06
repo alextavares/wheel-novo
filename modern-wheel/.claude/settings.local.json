@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:pickerwheel.com)",
+      "Bash(mv:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(timeout 5 npm run dev)",
+      "Bash(grep:*)",
+      "Bash(pkill:*)"
+    ],
+    "deny": []
+  }
+}
