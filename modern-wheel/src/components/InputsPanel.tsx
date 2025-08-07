@@ -294,6 +294,45 @@ export default function InputsPanel({
     return def;
   };
 
+  // --- Drag & Drop (HTML5) para reordenar itens da lista ---
+  const dragSrcIndexRef = useRef<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const onDragStart = (index: number, e: React.DragEvent) => {
+    dragSrcIndexRef.current = index;
+    try { e.dataTransfer.setData("text/plain", String(index)); } catch {}
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onDragOver = (index: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) setDragOverIndex(index);
+  };
+  const onDragLeave = (_index: number, _e: React.DragEvent) => {
+    setDragOverIndex(null);
+  };
+  const onDrop = (index: number, e: React.DragEvent) => {
+    e.preventDefault();
+    const from = dragSrcIndexRef.current ?? Number(e.dataTransfer.getData("text/plain"));
+    const to = index;
+    setDragOverIndex(null);
+    dragSrcIndexRef.current = null;
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return;
+    if (from === to) return;
+
+    const next = [...itemsCast];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    onChange((next as unknown) as WheelItem[]);
+  };
+  const onDragEnd = () => {
+    setDragOverIndex(null);
+    dragSrcIndexRef.current = null;
+  };
+
+  const getDragClass = (index: number) =>
+    dragOverIndex === index ? "ring-2 ring-emerald-400 rounded-md" : "";
+
   return (
     <div className="space-y-4" aria-label="Painel de entradas da roda" data-testid="inputs-panel-root">
       {/* Seção: Itens */}
@@ -375,8 +414,18 @@ export default function InputsPanel({
           </p>
         ) : (
           <ul className="space-y-2 max-h-[50vh] overflow-auto pr-1">
-            {itemsCast.map((item) => (
-              <li key={item.id} className="flex items-start gap-2">
+            {itemsCast.map((item, idx) => (
+              <li
+                key={item.id}
+                className={`flex items-start gap-2 ${getDragClass(idx)}`}
+                draggable
+                onDragStart={(e) => onDragStart(idx, e)}
+                onDragOver={(e) => onDragOver(idx, e)}
+                onDragLeave={(e) => onDragLeave(idx, e)}
+                onDrop={(e) => onDrop(idx, e)}
+                onDragEnd={onDragEnd}
+                aria-grabbed="true"
+              >
                 <button
                   className="btn-xs"
                   onClick={() => moveUp(item.id)}
@@ -394,7 +443,7 @@ export default function InputsPanel({
                   ▼
                 </button>
 
-                <div className="flex-1 flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-2 cursor-move select-none" title="Arraste para reordenar">
                   {Boolean((item as any).imageUrl) && (
                     <img
                       src={(item as any).imageUrl}
