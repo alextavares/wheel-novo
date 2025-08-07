@@ -418,13 +418,6 @@ export default function InputsPanel({
               <li
                 key={item.id}
                 className={`flex items-start gap-2 ${getDragClass(idx)}`}
-                draggable
-                onDragStart={(e) => onDragStart(idx, e)}
-                onDragOver={(e) => onDragOver(idx, e)}
-                onDragLeave={(e) => onDragLeave(idx, e)}
-                onDrop={(e) => onDrop(idx, e)}
-                onDragEnd={onDragEnd}
-                aria-grabbed="true"
               >
                 <button
                   className="btn-xs"
@@ -443,12 +436,24 @@ export default function InputsPanel({
                   ▼
                 </button>
 
-                <div className="flex-1 flex items-center gap-2 cursor-move select-none" title="Arraste para reordenar">
+                {/* HANDLE DE ARRASTAR */}
+                <div
+                  className="flex-1 flex items-center gap-2 cursor-move select-none"
+                  title="Arraste para reordenar"
+                  draggable
+                  onDragStart={(e) => onDragStart(idx, e)}
+                  onDragOver={(e) => onDragOver(idx, e)}
+                  onDragLeave={(e) => onDragLeave(idx, e)}
+                  onDrop={(e) => onDrop(idx, e)}
+                  onDragEnd={onDragEnd}
+                >
                   {Boolean((item as any).imageUrl) && (
                     <img
                       src={(item as any).imageUrl}
                       alt=""
                       className="w-8 h-8 object-cover rounded"
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).style.display =
                           "none";
@@ -466,6 +471,8 @@ export default function InputsPanel({
                         value={item.label}
                         aria-label="Editar rótulo do item (máx. 80 caracteres)"
                         maxLength={80}
+                        draggable={false}
+                        onDragStart={(e) => e.preventDefault()}
                         onChange={(e) => {
                           const raw = e.target.value;
                           const trimmed = raw.replace(/\s+/g, " ");
@@ -532,6 +539,8 @@ export default function InputsPanel({
                     max={999}
                     aria-label="Peso do item (entre 1 e 999)"
                     value={item.weight}
+                    draggable={false}
+                    onDragStart={(e) => e.preventDefault()}
                     onChange={(e) => {
                       const raw = e.target.value || "1";
                       let v = parseInt(raw, 10);
