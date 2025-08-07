@@ -333,6 +333,23 @@ export default function InputsPanel({
   const getDragClass = (index: number) =>
     dragOverIndex === index ? "ring-2 ring-emerald-400 rounded-md" : "";
 
+  // Corrige comportamento do HTML5 DnD em alguns navegadores:
+  // - Evita que o input dentro do LI capture foco enquanto arrasta
+  // - Define uma imagem de arraste mínima para garantir que o drag inicie
+  const dragImgRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // cria uma "drag image" invisível (1x1) para browsers que exigem
+    const el = document.createElement('div');
+    el.style.width = '1px';
+    el.style.height = '1px';
+    el.style.opacity = '0';
+    el.style.position = 'fixed';
+    el.style.top = '-1000px';
+    document.body.appendChild(el);
+    dragImgRef.current = el;
+    return () => { try { document.body.removeChild(el); } catch {} };
+  }, []);
+
   return (
     <div className="space-y-4" aria-label="Painel de entradas da roda" data-testid="inputs-panel-root">
       {/* Seção: Itens */}
@@ -413,35 +430,48 @@ export default function InputsPanel({
             {!mounted ? 'Carregando…' : 'Nenhum item ainda. Adicione alguns acima.'}
           </p>
         ) : (
-          <ul className="space-y-2 max-h-[50vh] overflow-auto pr-1">
+          <ul
+            className="space-y-2 max-h-[50vh] overflow-auto pr-1"
+            onDragOver={(e) => { e.preventDefault(); /* garante drop na lista */ }}
+          >
             {itemsCast.map((item, idx) => (
               <li
                 key={item.id}
                 className={`flex items-start gap-2 ${getDragClass(idx)}`}
+                onDragOver={(e) => { e.preventDefault(); /* necessário em alguns browsers */ }}
               >
-                <button
-                  className="btn-xs"
-                  onClick={() => moveUp(item.id)}
-                  aria-label="Subir item"
-                  title="Subir item"
+                {/* Handle visual dedicado (mais claro para usuário) */}
+                <div
+                  className="w-5 h-8 mt-[2px] mr-1 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                  title="Arraste para reordenar"
+                  draggable
+                  onDragStart={(e) => {
+                    onDragStart(idx, e);
+                    // define imagem de arraste mínima (melhora compat Windows/Chrome)
+                    try { if (dragImgRef.current) e.dataTransfer.setDragImage(dragImgRef.current, 0, 0); } catch {}
+                  }}
+                  onDragEnd={onDragEnd}
                 >
-                  ▲
-                </button>
-                <button
-                  className="btn-xs"
-                  onClick={() => moveDown(item.id)}
-                  aria-label="Descer item"
-                  title="Descer item"
-                >
-                  ▼
-                </button>
+                  {/* ícone 'grip' */}
+                  <svg width="12" height="16" viewBox="0 0 12 16" aria-hidden="true">
+                    <circle cx="3" cy="3" r="1.1" fill="currentColor" />
+                    <circle cx="3" cy="8" r="1.1" fill="currentColor" />
+                    <circle cx="3" cy="13" r="1.1" fill="currentColor" />
+                    <circle cx="9" cy="3" r="1.1" fill="currentColor" />
+                    <circle cx="9" cy="8" r="1.1" fill="currentColor" />
+                    <circle cx="9" cy="13" r="1.1" fill="currentColor" />
+                  </svg>
+                </div>
 
-                {/* HANDLE DE ARRASTAR */}
+                {/* ÁREA CONTEÚDO: recebe eventos para ordenação e dá cursor-move amplo */}
                 <div
                   className="flex-1 flex items-center gap-2 cursor-move select-none"
                   title="Arraste para reordenar"
                   draggable
-                  onDragStart={(e) => onDragStart(idx, e)}
+                  onDragStart={(e) => {
+                    onDragStart(idx, e);
+                    try { if (dragImgRef.current) e.dataTransfer.setDragImage(dragImgRef.current, 0, 0); } catch {}
+                  }}
                   onDragOver={(e) => onDragOver(idx, e)}
                   onDragLeave={(e) => onDragLeave(idx, e)}
                   onDrop={(e) => onDrop(idx, e)}
@@ -453,6 +483,10 @@ export default function InputsPanel({
                       alt=""
                       className="w-8 h-8 object-cover rounded"
                       draggable={false}
+                      onMouseDown={(e) => {
+                        // evita que começar o drag sobre a imagem selecione/arraste ela
+                        e.preventDefault();
+                      }}
                       onDragStart={(e) => e.preventDefault()}
                       onError={(e) => {
                         (e.currentTarget as HTMLImageElement).style.display =
@@ -472,6 +506,13 @@ export default function InputsPanel({
                         aria-label="Editar rótulo do item (máx. 80 caracteres)"
                         maxLength={80}
                         draggable={false}
+                        onMouseDown={(e) => {
+                          // impede captura do foco enquanto inicia arraste
+                          if ((e.buttons & 1) === 1) {
+                            // se botão esquerdo pressionado, não focar
+                            e.preventDefault();
+                          }
+                        }}
                         onDragStart={(e) => e.preventDefault()}
                         onChange={(e) => {
                           const raw = e.target.value;
