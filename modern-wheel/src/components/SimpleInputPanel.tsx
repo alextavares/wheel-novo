@@ -216,7 +216,7 @@ export default function SimpleInputPanel({
                 <Image className="w-3.5 h-3.5 text-gray-600" />
               </button>
               <input
-                ref={(el) => (fileInputRefs.current[item.id] = el)}
+                ref={(el) => { fileInputRefs.current[item.id] = el; }}
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleImageUpload(item.id, e)}

@@ -285,7 +285,8 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
       
       // Remove qualquer animação anterior e aplica a nova
       wheelRef.current.style.animation = '';
-      void wheelRef.current.offsetHeight; // Force reflow
+      // Force reflow para reiniciar keyframes (SVG não tem offsetHeight tipado; usa getBoundingClientRect)
+      void wheelRef.current.getBoundingClientRect();
       wheelRef.current.style.animation = `spin-wheel ${duration}ms ${easing} forwards`;
     }
 
@@ -551,55 +552,33 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
                   <stop offset="100%" stopColor="#e2e8f0" />
                 </radialGradient>
 
+                {/* Apenas clipPaths por fatia; imagens serão renderizadas fora de <defs> */}
                 {items.map((item, index) => {
-                  const imageUrl = ((item as any).image || (item as any).imageUrl) as string | undefined;
-                  if (!imageUrl) return null;
+                  const imageAny = ((item as any).image || (item as any).imageUrl) as string | undefined;
+                  if (!imageAny) return null;
 
-                  // Configuração simplificada para mostrar a imagem completa
-                  // Centralizar a imagem no pattern e deixar que o preserveAspectRatio faça o trabalho
-                  const patternSize = radius * 2;
-                  
-                  // preserveAspectRatio - usar 'meet' para mostrar a imagem completa
-                  const par = 'xMidYMid meet';
+                  const startAngle = (index * segmentAngle - 90) * (Math.PI / 180);
+                  const endAngle = ((index + 1) * segmentAngle - 90) * (Math.PI / 180);
+
+                  // Geometria do setor para clip
+                  const x1 = centerX + radius * Math.cos(startAngle);
+                  const y1 = centerY + radius * Math.sin(startAngle);
+                  const x2 = centerX + radius * Math.cos(endAngle);
+                  const y2 = centerY + radius * Math.sin(endAngle);
+                  const largeArcFlag = segmentAngle > 180 ? 1 : 0;
+                  const sectorPath = [
+                    `M ${centerX} ${centerY}`,
+                    `L ${x1} ${y1}`,
+                    `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+                    'Z'
+                  ].join(' ');
+
+                  const clipId = `clip-${item.id}`;
 
                   return (
-                    <g key={`image-defs-${item.id}`}>
-                      <clipPath id={`clip-${item.id}`}>
-                        <path d={(() => {
-                          const startAngle = (index * segmentAngle - 90) * (Math.PI / 180);
-                          const endAngle = ((index + 1) * segmentAngle - 90) * (Math.PI / 180);
-                          const x1 = centerX + radius * Math.cos(startAngle);
-                          const y1 = centerY + radius * Math.sin(startAngle);
-                          const x2 = centerX + radius * Math.cos(endAngle);
-                          const y2 = centerY + radius * Math.sin(endAngle);
-                          const largeArcFlag = segmentAngle > 180 ? 1 : 0;
-                          return [
-                            `M ${centerX} ${centerY}`,
-                            `L ${x1} ${y1}`,
-                            `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
-                            'Z'
-                          ].join(' ');
-                        })()} />
-                      </clipPath>
-                      <pattern id={`pattern-${item.id}`} patternUnits="userSpaceOnUse" x="0" y="0" width={320} height={320}>
-                        <image
-                          href={imageUrl}
-                          preserveAspectRatio={par}
-                          width={320}
-                          height={320}
-                          x={0}
-                          y={0}
-                          opacity={(() => {
-                            const v = (items[index] as any).imageOpacity;
-                            const num = Number(v);
-                            if (!isFinite(num)) return 1;
-                            if (num < 0) return 0;
-                            if (num > 1) return 1;
-                            return num;
-                          })()}
-                        />
-                      </pattern>
-                    </g>
+                    <clipPath key={`clip-${item.id}`} id={clipId}>
+                      <path d={sectorPath} />
+                    </clipPath>
                   );
                 })}
               </defs>
@@ -645,6 +624,7 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
               {items.map((item, index) => {
                 const startAngle = (index * segmentAngle - 90) * (Math.PI / 180);
                 const endAngle = ((index + 1) * segmentAngle - 90) * (Math.PI / 180);
+                const midAngle = (startAngle + endAngle) / 2;
 
                 const x1 = centerX + radius * Math.cos(startAngle);
                 const y1 = centerY + radius * Math.sin(startAngle);
@@ -661,17 +641,42 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
                 ].join(' ');
 
                 // Alternância de cores estilo PickerWheel quando não houver imagem/cores fornecidas
-                const fallbackA = '#ef4444'; // red-500
-                const fallbackB = '#3b82f6'; // blue-500
+                const fallbackA = '#ef4444';
+                const fallbackB = '#3b82f6';
                 const altFill = index % 2 === 0 ? fallbackA : fallbackB;
-                const fillColor = ((item as any).image || (item as any).imageUrl) ? `url(#pattern-${item.id})` : (item.color || altFill);
+
+                const hasImage = Boolean((item as any).image || (item as any).imageUrl);
+                const fillColor = hasImage ? undefined : (item.color || altFill);
+
+                // Geometria do box de imagem (iguais aos usados nas defs)
+                const rInner = radius * 0.2;
+                const rOuter = radius;
+                const ringThickness = rOuter - rInner;
+                const boxW = ringThickness;
+                const boxH = ringThickness;
+                const boxCenterR = (rInner + rOuter) / 2;
+                const boxCx = centerX + boxCenterR * Math.cos(midAngle);
+                const boxCy = centerY + boxCenterR * Math.sin(midAngle);
+
+                // Opacidade configurável
+                const opacity = (() => {
+                  const v = (items[index] as any).imageOpacity;
+                  const num = Number(v);
+                  if (!isFinite(num)) return 1;
+                  if (num < 0) return 0;
+                  if (num > 1) return 1;
+                  return num;
+                })();
+
+                const clipId = `clip-${item.id}`;
+                const imageAny = ((item as any).image || (item as any).imageUrl) as string | undefined;
 
                 const textAngle = (index * segmentAngle + segmentAngle / 2 - 90) * (Math.PI / 180);
                 const textRadius = radius * 0.7;
                 const textX = centerX + textRadius * Math.cos(textAngle);
                 const textY = centerY + textRadius * Math.sin(textAngle);
 
-                // Tipografia dinâmica e truncamento por quantidade de segmentos
+                // Tipografia dinâmica
                 const n = Math.max(1, items.length);
                 let fontPx = 12;
                 let maxChars = 24;
@@ -680,9 +685,9 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
                 else if (n <= 20) { fontPx = 12; maxChars = 18; }
                 else { fontPx = 10.5; maxChars = 15; }
 
-                // quebra de linha suave: até 2 linhas
+                // quebras
                 const rawLabel = String(item.text || '');
-                const baseText = ((item as any).image || (item as any).imageUrl)
+                const baseText = (hasImage)
                   ? rawLabel.slice(0, Math.max(10, Math.min(18, maxChars)))
                   : rawLabel.slice(0, maxChars);
                 const words = baseText.split(' ');
@@ -695,14 +700,13 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
                   } else {
                     if (current) lines.push(current);
                     current = w;
-                    if (lines.length >= 1) break; // 2 linhas no máximo
+                    if (lines.length >= 1) break;
                   }
                 }
                 if (current && lines.length < 2) lines.push(current);
                 if (lines.length === 0) lines.push(baseText);
 
-                // Heurística de auto-contraste:
-                const hasImage = Boolean((item as any).image || (item as any).imageUrl);
+                // contraste
                 const baseHex = (item.color || altFill).replace('#', '');
                 const r = parseInt(baseHex.substring(0, 2), 16);
                 const g = parseInt(baseHex.substring(2, 4), 16);
@@ -713,18 +717,75 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
                 const textStroke = hasImage ? '#000000' : (preferDarkText ? '#FFFFFF' : '#000000');
 
                 const isHighlighted = item.id === highlightItemId;
+
                 return (
                   <g key={item.id} className="wheel-segment" filter={isHighlighted ? 'url(#glow)' : undefined}>
-                    {/* borda do slice mais marcada */}
+                    {/* guia visual removido */}
+
+                    {/* Imagem clipada pelo setor (render fora de <defs>) */}
+                    {hasImage && (
+                      <g clipPath={`url(#${clipId})`} pointerEvents="none">
+                        <g transform={`translate(${boxCx}, ${boxCy})`}>
+                          {/^https?:\/\//i.test(String(imageAny)) ? (
+                            <foreignObject
+                              x={-boxW / 2}
+                              y={-boxH / 2}
+                              width={boxW}
+                              height={boxH}
+                              opacity={opacity}
+                              requiredExtensions="http://www.w3.org/1999/xhtml"
+                            >
+                              {React.createElement(
+                                'div' as any,
+                                {
+                                  xmlns: 'http://www.w3.org/1999/xhtml',
+                                  style: {
+                                    width: '100%',
+                                    height: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  } as React.CSSProperties,
+                                },
+                                React.createElement('img', {
+                                  src: imageAny!,
+                                  alt: '',
+                                  style: {
+                                    maxWidth: '100%',
+                                    maxHeight: '100%',
+                                    objectFit: 'contain',
+                                    display: 'block',
+                                  } as React.CSSProperties,
+                                  crossOrigin: 'anonymous',
+                                  loading: 'eager',
+                                })
+                              )}
+                            </foreignObject>
+                          ) : (
+                            <image
+                              href={imageAny}
+                              x={-boxW / 2}
+                              y={-boxH / 2}
+                              width={boxW}
+                              height={boxH}
+                              preserveAspectRatio="xMidYMid meet"
+                              opacity={opacity}
+                              crossOrigin="anonymous"
+                            />
+                          )}
+                        </g>
+                      </g>
+                    )}
+
+                    {/* borda do slice */}
                     <path
                       d={pathData}
-                      fill={fillColor}
+                      fill={fillColor || 'transparent'}
                       stroke={isHighlighted ? '#F6E05E' : '#0b1220'}
                       strokeWidth={isHighlighted ? 3.5 : 1.5}
-                      clipPath={((item as any).image || (item as any).imageUrl) ? `url(#clip-${item.id})` : undefined}
                     />
 
-                    {/* marca radial fina entre segmentos para contraste */}
+                    {/* marca radial */}
                     <line
                       x1={centerX}
                       y1={centerY}
@@ -734,7 +795,7 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
                       strokeWidth="0.75"
                     />
 
-                    {/* Texto com halo para legibilidade e tipografia ajustável */}
+                    {/* texto */}
                     <text
                       x={textX}
                       y={textY}
@@ -751,9 +812,7 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
                       lengthAdjust="spacingAndGlyphs"
                     >
                       {lines.length === 1 ? (
-                        <tspan x={textX} dy="0">
-                          {lines[0]}
-                        </tspan>
+                        <tspan x={textX} dy="0">{lines[0]}</tspan>
                       ) : (
                         <>
                           <tspan x={textX} dy="-0.45em">{lines[0]}</tspan>

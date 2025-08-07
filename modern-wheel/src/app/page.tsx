@@ -61,7 +61,9 @@ function CleanHomePageContent() {
   }, []);
 
   const handleSpin = () => {
-    if (items.filter(item => !item.hidden).length >= 2) {
+    // itens em memória vêm do hook e podem não ter a prop 'hidden' no tipo WheelItem.
+    // Considera hidden === false por padrão quando ausente.
+    if (items.filter(item => !(item as any).hidden).length >= 2) {
       spin();
     }
   };
@@ -82,7 +84,8 @@ function CleanHomePageContent() {
     }
   };
 
-  const visibleItems = items.filter(item => !item.hidden);
+  // visibilidade tolerante: trata 'hidden' ausente como false
+  const visibleItems = items.filter(item => !(item as any).hidden);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 transition-colors">
@@ -240,15 +243,22 @@ function CleanHomePageContent() {
                 </div>
               </div>
             )}
+      
+            {/* Result Modal inline removed to avoid duplication */}
           </div>
         </div>
       </main>
-
-      {/* Result Modal */}
+      
+      {/* Single Result Modal (type-safe props) */}
       {showResult && currentResult && (
         <ResultModal
           result={currentResult}
           onClose={() => setShowResult(false)}
+          onSpinAgain={() => {
+            setShowResult(false);
+            handleSpin();
+          }}
+          confettiEnabled={config.confettiEnabled}
         />
       )}
     </div>

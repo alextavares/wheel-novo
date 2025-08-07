@@ -45,9 +45,9 @@ export function useWheel() {
     reorderItems([]);
   }, [reorderItems]);
 
-  // Spin the wheel
+  // Spin the wheel (tolerante: 'hidden' pode não existir no tipo)
   const spin = useCallback(() => {
-    if (state.items.filter(item => !item.hidden).length >= 2 && !state.isSpinning) {
+    if (state.items.filter(item => !(item as any).hidden).length >= 2 && !state.isSpinning) {
       setSpinning(true);
     }
   }, [state.items, state.isSpinning, setSpinning]);
