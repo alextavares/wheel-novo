@@ -274,6 +274,9 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
     lastTickAngleRef.current = currentRotation.current % 360;
 
     if (wheelRef.current) {
+      // Interrompe o idle sway durante o spin
+      wheelRef.current.classList.remove('wheel-idle-sway');
+
       // Animação simplificada com uma única rotação suave
       const easing = easingToCss(safeConfig.easing);
       
@@ -426,13 +429,27 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
  }, [items, isSpinning, onSpin, onResult, safeConfig.easing, safeConfig.randomStart, safeConfig.spinDuration]);
 
   useEffect(() => {
-    if (!isSpinning && wheelRef.current) {
+    if (!wheelRef.current) return;
+
+    // Quando parar de girar, limpa animações de spin
+    if (!isSpinning) {
+      // fixa a base atual e aplica balanço sutil
+      const base = currentRotation.current % 360;
       wheelRef.current.style.animation = '';
-      wheelRef.current.style.transform = `rotate(${currentRotation.current}deg)`;
+      wheelRef.current.style.setProperty('--sway-base', `${base}deg`);
+      wheelRef.current.style.setProperty('--sway-ampl', `4deg`);       // amplitude ±4°
+      wheelRef.current.style.setProperty('--sway-duration', `4200ms`); // duração suave 4.2s
+      wheelRef.current.classList.add('wheel-idle-sway');
+      // garante estilo inicial
+      wheelRef.current.style.transform = `rotate(${base}deg)`;
+    } else {
+      // Em spin real: remove o idle sway para evitar conflito visual
+      wheelRef.current.classList.remove('wheel-idle-sway');
+      // a animação principal de spin já é aplicada em spin()
     }
   }, [isSpinning]);
 
-  // CSS keyframes (garante existência)
+  // CSS keyframes (garante existência) + idle sway
   useEffect(() => {
     const id = 'mw-spin-keyframes';
     let styleEl = document.getElementById(id);
@@ -446,14 +463,45 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
         from { transform: rotate(var(--rotation-start, 0deg)); }
         to { transform: rotate(var(--rotation, 360deg)); }
       }
+
+      /* Idle sway (balanço sutil) */
+      @keyframes mw-idle-sway {
+        0%   { transform: rotate(calc(var(--sway-base, 0deg) - var(--sway-ampl, 4deg))); }
+        50%  { transform: rotate(calc(var(--sway-base, 0deg) + var(--sway-ampl, 4deg))); }
+        100% { transform: rotate(calc(var(--sway-base, 0deg) - var(--sway-ampl, 4deg))); }
+      }
       
       .wheel-spinning {
         transform-origin: center center !important;
         animation: spin-wheel var(--duration, 3s) var(--easing, cubic-bezier(0.215, 0.61, 0.355, 1)) forwards;
+      }
+
+      /* classe aplicada quando parado para dar vida */
+      .wheel-idle-sway {
+        transform-origin: center center !important;
+        animation: mw-idle-sway var(--sway-duration, 3800ms) ease-in-out infinite;
+        will-change: transform;
       }`;
     document.head.appendChild(style);
   }, []);
 
+  // Ativa idle sway logo após montar (se não estiver girando)
+  useEffect(() => {
+    const el = wheelRef.current;
+    if (!el) return;
+    if (!isSpinning) {
+      const base = currentRotation.current % 360;
+      el.style.setProperty('--sway-base', `${base}deg`);
+      el.style.setProperty('--sway-ampl', `4deg`);
+      el.style.setProperty('--sway-duration', `4200ms`);
+      el.classList.add('wheel-idle-sway');
+    }
+    return () => {
+      try { el.classList.remove('wheel-idle-sway'); } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  
   const centerX = 160;
   const centerY = 160;
   const radius = 140;
@@ -473,14 +521,14 @@ export default function WheelComponent({ items, isSpinning, onSpin, onResult, co
         <>
           {/* Container responsivo da roda - maior e centrada */}
           <div className="relative mx-auto w-[min(92vw,32rem)] sm:w-[min(92vw,36rem)] lg:w-[min(92vw,40rem)] aspect-square">
-            {/* Ponteiro/top marker com base e contorno (refino visual estilo pickerwheel) */}
+            {/* Ponteiro/top marker invertido para apontar a seleção para baixo */}
             <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-20">
               {/* base do pointer */}
               <div className="mx-auto w-20 h-6 bg-white/95 dark:bg-neutral-900/95 border border-slate-300 dark:border-neutral-700 rounded-b-2xl shadow-md" />
-              {/* seta principal */}
-              <div className="w-0 h-0 mx-auto -mt-1 border-l-[16px] border-r-[16px] border-b-[24px] border-l-transparent border-r-transparent border-b-rose-500 dark:border-b-rose-400 drop-shadow" />
-              {/* contorno sutil */}
-              <div className="w-0 h-0 mx-auto -mt-[24px] border-l-[18px] border-r-[18px] border-b-[26px] border-l-transparent border-r-transparent border-b-black/15 pointer-events-none" />
+              {/* seta principal (apontando para baixo) */}
+              <div className="w-0 h-0 mx-auto -mt-1 border-l-[16px] border-r-[16px] border-t-[24px] border-l-transparent border-r-transparent border-t-rose-500 dark:border-t-rose-400 drop-shadow" />
+              {/* contorno sutil da seta */}
+              <div className="w-0 h-0 mx-auto -mt-[24px] border-l-[18px] border-r-[18px] border-t-[26px] border-l-transparent border-r-transparent border-t-black/15 pointer-events-none" />
             </div>
 
             {/* Botão central "SPIN" sobreposto */}
